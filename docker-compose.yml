@@ -1,0 +1,123 @@
+name: momo-store
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-backend-common: &backend-common
+  build:
+    context: ./backend
+    dockerfile: Dockerfile
+  image: ${DOCKER_USER:-local}/docker-project-backend:${IMAGE_TAG:-latest}
+  restart: unless-stopped
+  logging: *default-logging
+  networks:
+    - backend-net
+  expose:
+    - "8081"
+  secrets:
+    - api_secret
+  environment:
+    API_SECRET_FILE: /run/secrets/api_secret
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/health"]
+    interval: 30s
+    timeout: 5s
+    retries: 3
+    start_period: 10s
+  deploy:
+    resources:
+      limits:
+        cpus: "0.50"
+        memory: 256M
+      reservations:
+        cpus: "0.10"
+        memory: 64M
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp:mode=1777,size=64m
+  volumes:
+    - backend-logs:/app/logs
+
+x-frontend-common: &frontend-common
+  build:
+    context: ./frontend
+    dockerfile: Dockerfile
+    args:
+      VUE_APP_API_URL: ${VUE_APP_API_URL:-http://localhost:8081}
+  image: ${DOCKER_USER:-local}/docker-project-frontend:${IMAGE_TAG:-latest}
+  restart: unless-stopped
+  logging: *default-logging
+  networks:
+    - frontend-net
+    - backend-net
+  expose:
+    - "8080"
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+    interval: 30s
+    timeout: 5s
+    retries: 3
+    start_period: 15s
+  deploy:
+    resources:
+      limits:
+        cpus: "0.50"
+        memory: 256M
+      reservations:
+        cpus: "0.10"
+        memory: 64M
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp:mode=1777,size=64m
+    - /var/cache/nginx:mode=1777,size=32m
+    - /var/run:mode=1777,size=8m
+
+services:
+  backend:
+    <<: *backend-common
+    networks:
+      - backend-net
+      - edge-net
+    ports:
+      - "8081:8081"
+
+  frontend:
+    <<: *frontend-common
+    networks:
+      - frontend-net
+      - backend-net
+      - edge-net
+    ports:
+      - "80:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+networks:
+  edge-net:
+    driver: bridge
+  frontend-net:
+    driver: bridge
+    internal: true
+  backend-net:
+    driver: bridge
+    internal: true
+
+volumes:
+  backend-logs:
+    driver: local
+
+secrets:
+  api_secret:
+    file: ./secrets/api_secret.txt

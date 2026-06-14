@@ -1,0 +1,14 @@
+services:
+  backend:
+    read_only: false
+    cap_drop: []
+    security_opt: []
+    deploy:
+      resources: {}
+
+  frontend:
+    read_only: false
+    cap_drop: []
+    security_opt: []
+    deploy:
+      resources: {}
