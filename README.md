@@ -1,7 +1,6 @@
 # Momo Store — Docker
 
 Контейнеризация приложения Momo Store (Go backend + Vue.js frontend).
-
 ## Быстрый старт
 
 ```bash
